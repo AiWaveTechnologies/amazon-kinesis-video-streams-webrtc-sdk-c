@@ -1611,7 +1611,7 @@ STATUS lwsReceiveMessage(PSignalingClient pSignalingClient, PCHAR pMessage, UINT
     UINT32 i, strLen, outLen = MAX_SIGNALING_MESSAGE_LEN;
     UINT32 tokenCount;
     PSignalingMessageWrapper pSignalingMessageWrapper = NULL;
-#ifndef KVS_PLAT_ESP_FREERTOS
+#if !defined(KVS_PLAT_ESP_FREERTOS) && !defined(KVS_PLAT_RTK_FREERTOS)
     TID receivedTid = INVALID_TID_VALUE;
 #endif
     BOOL parsedMessageType = FALSE, parsedStatusResponse = FALSE;
@@ -1785,7 +1785,7 @@ STATUS lwsReceiveMessage(PSignalingClient pSignalingClient, PCHAR pMessage, UINT
             break;
     }
 
-#ifndef KVS_PLAT_ESP_FREERTOS
+#if !defined(KVS_PLAT_ESP_FREERTOS) && !defined(KVS_PLAT_RTK_FREERTOS)
     // Issue the callback on a separate thread
     CHK_STATUS(THREAD_CREATE(&receivedTid, lwsReceiveMessageWrapper, (PVOID) pSignalingMessageWrapper));
     CHK_STATUS(THREAD_DETACH(receivedTid));
@@ -1803,7 +1803,7 @@ CleanUp:
             retStatus = pSignalingClient->signalingClientCallbacks.errorReportFn(pSignalingClient->signalingClientCallbacks.customData, retStatus,
                                                                                  pMessage, messageLen);
         }
-#ifndef KVS_PLAT_ESP_FREERTOS
+#if !defined(KVS_PLAT_ESP_FREERTOS) && !defined(KVS_PLAT_RTK_FREERTOS)
         // Kill the receive thread on error
         if (IS_VALID_TID_VALUE(receivedTid)) {
             THREAD_CANCEL(receivedTid);
@@ -1953,7 +1953,7 @@ CleanUp:
     return retStatus;
 }
 
-#ifdef KVS_PLAT_ESP_FREERTOS
+#if defined(KVS_PLAT_ESP_FREERTOS) || defined(KVS_PLAT_RTK_FREERTOS)
 /** #TBD, need to add the code of initialization. */
 TID receivedTid = INVALID_TID_VALUE;
 QueueHandle_t lwsMsgQ = NULL;

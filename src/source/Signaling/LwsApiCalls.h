@@ -215,7 +215,7 @@ STATUS lwsCreateCallInfo(PSignalingClient, PRequestInfo, UINT32, PLwsCallInfo*);
 STATUS lwsFreeCallInfo(PLwsCallInfo*);
 
 PVOID lwsReceiveMessageWrapper(PVOID);
-#ifdef KVS_PLAT_ESP_FREERTOS
+#if defined(KVS_PLAT_ESP_FREERTOS) || defined(KVS_PLAT_RTK_FREERTOS)
 STATUS lwsDispatchMsg(PVOID pMessage);
 #endif
 
