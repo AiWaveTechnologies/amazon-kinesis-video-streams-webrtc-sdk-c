@@ -91,7 +91,9 @@ STATUS signalingCreate(PSignalingClientInfoInternal pClientInfo, PChannelInfo pC
     creationInfo.timeout_secs = SIGNALING_SERVICE_API_CALL_TIMEOUT_IN_SECONDS;
     creationInfo.gid = -1;
     creationInfo.uid = -1;
-    creationInfo.client_ssl_ca_filepath = pChannelInfo->pCertPath;
+    //creationInfo.client_ssl_ca_filepath = pChannelInfo->pCertPath;
+    creationInfo.client_ssl_ca_mem = WEBRTC_CERTIFICATE;
+    creationInfo.client_ssl_ca_mem_len = sizeof(WEBRTC_CERTIFICATE);
     creationInfo.client_ssl_cipher_list = "HIGH:!PSK:!RSP:!eNULL:!aNULL:!RC4:!MD5:!DES:!3DES:!aDH:!kDH:!DSS";
     creationInfo.ka_time = SIGNALING_SERVICE_TCP_KEEPALIVE_IN_SECONDS;
     creationInfo.ka_probes = SIGNALING_SERVICE_TCP_KEEPALIVE_PROBE_COUNT;
