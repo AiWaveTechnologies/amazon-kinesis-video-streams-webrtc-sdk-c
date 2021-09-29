@@ -224,7 +224,7 @@ STATUS lwsWriteData(PSignalingClient, BOOL);
 STATUS lwsTerminateListenerLoop(PSignalingClient);
 STATUS lwsReceiveMessage(PSignalingClient, PCHAR, UINT32);
 STATUS lwsGetMessageTypeFromString(PCHAR, UINT32, SIGNALING_MESSAGE_TYPE*);
-STATUS lwsWakeServiceEventLoop(PSignalingClient, UINT32);
+STATUS lwsWakeServiceEventLoop(PSignalingClient);
 STATUS lwsTerminateConnectionWithStatus(PSignalingClient, SERVICE_CALL_RESULT);
 
 #ifdef __cplusplus

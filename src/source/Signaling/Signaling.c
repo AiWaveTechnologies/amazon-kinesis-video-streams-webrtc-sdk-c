@@ -81,9 +81,6 @@ STATUS signalingCreate(PSignalingClientInfoInternal pClientInfo, PChannelInfo pC
     pSignalingClient->signalingProtocols[PROTOCOL_INDEX_WSS].name = WSS_SCHEME_NAME;
     pSignalingClient->signalingProtocols[PROTOCOL_INDEX_WSS].callback = (lws_callback_function*) lwsWssCallbackRoutine;
 
-    pSignalingClient->currentWsi[PROTOCOL_INDEX_HTTPS] = NULL;
-    pSignalingClient->currentWsi[PROTOCOL_INDEX_WSS] = NULL;
-
     MEMSET(&creationInfo, 0x00, SIZEOF(struct lws_context_creation_info));
     creationInfo.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
     creationInfo.port = CONTEXT_PORT_NO_LISTEN;
@@ -109,7 +106,6 @@ STATUS signalingCreate(PSignalingClientInfoInternal pClientInfo, PChannelInfo pC
     ATOMIC_STORE_BOOL(&pSignalingClient->deleting, FALSE);
     ATOMIC_STORE_BOOL(&pSignalingClient->deleted, FALSE);
     ATOMIC_STORE_BOOL(&pSignalingClient->iceConfigRetrieved, FALSE);
-    ATOMIC_STORE_BOOL(&pSignalingClient->serviceLockContention, FALSE);
 
     // Add to the signal handler
     // signal(SIGINT, lwsSignalHandler);
@@ -210,10 +206,10 @@ STATUS signalingFree(PSignalingClient* ppSignalingClient)
     signalingTerminateOngoingOperations(pSignalingClient, TRUE);
 
     if (pSignalingClient->pLwsContext != NULL) {
-        MUTEX_LOCK(pSignalingClient->lwsServiceLock);
+        MUTEX_LOCK(pSignalingClient->lwsSerializerLock);
         lws_context_destroy(pSignalingClient->pLwsContext);
         pSignalingClient->pLwsContext = NULL;
-        MUTEX_UNLOCK(pSignalingClient->lwsServiceLock);
+        MUTEX_UNLOCK(pSignalingClient->lwsSerializerLock);
     }
 
     freeStateMachine(pSignalingClient->pStateMachine);
