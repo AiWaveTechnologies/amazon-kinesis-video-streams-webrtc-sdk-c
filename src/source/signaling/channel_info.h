@@ -29,7 +29,7 @@ extern "C" {
  * DEFINITIONS
  ******************************************************************************/
 // Max control plane URI char len
-#define MAX_CONTROL_PLANE_URI_CHAR_LEN 256
+#define MAX_CONTROL_PLANE_URI_CHAR_LEN 512*10
 
 // Max channel status string length in describe API call in chars
 #define MAX_DESCRIBE_CHANNEL_STATUS_LEN 32

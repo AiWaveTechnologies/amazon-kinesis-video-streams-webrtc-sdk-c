@@ -4,6 +4,8 @@
 #define LOG_CLASS "TLS_mbedtls"
 #include "../Include_i.h"
 
+#define KVS_CA_CERT_PATH "0://cert.pem"
+
 STATUS createTlsSession(PTlsSessionCallbacks pCallbacks, PTlsSession* ppTlsSession)
 {
     ENTERS();

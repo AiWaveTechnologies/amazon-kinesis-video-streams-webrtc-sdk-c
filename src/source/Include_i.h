@@ -46,7 +46,7 @@ extern "C" {
 // INET/INET6 MUST be defined before usrsctp
 // If removed will cause corruption that is hard to determine at runtime
 #define INET  1
-#define INET6 1
+//#define INET6 1
 #ifdef ENABLE_DATA_CHANNEL
 #include <usrsctp.h>
 #endif
