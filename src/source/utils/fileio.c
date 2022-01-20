@@ -17,6 +17,10 @@
 #include "kvs/platform_utils.h"
 #include "fileio.h"
 
+#ifdef KVS_PLAT_RTK_FREERTOS
+#include "fatfs_wrap.h" //for AmebaPro2
+#endif
+
 /**
  * Read a file from the given full/relative filePath into the memory area pointed to by pBuffer.
  * Specifying NULL in pBuffer will return the size of the file.

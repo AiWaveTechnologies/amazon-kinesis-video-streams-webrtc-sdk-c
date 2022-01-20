@@ -6,6 +6,8 @@
 #include "io_buffer.h"
 #include "Rtp.h"
 
+#define KVS_CA_CERT_PATH "0://cert.pem"
+
 STATUS createTlsSession(PTlsSessionCallbacks pCallbacks, PTlsSession* ppTlsSession)
 {
     ENTERS();
