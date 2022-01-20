@@ -17,6 +17,10 @@
 #include <kvs/platform_utils.h>
 #include "directory.h"
 
+#ifdef KVS_PLAT_RTK_FREERTOS
+#include "fatfs_wrap.h" //for AmebaPro2
+#endif
+
 /**
  * Traverses the directory iteratively
  *
