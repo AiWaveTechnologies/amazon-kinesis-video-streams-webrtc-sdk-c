@@ -72,6 +72,7 @@ extern getTName globalGetThreadName;
 //
 extern createThread globalCreateThread;
 extern createThreadEx globalCreateThreadEx;
+extern createThreadEx globalCreateThreadExPri;
 extern joinThread globalJoinThread;
 extern threadSleep globalThreadSleep;
 extern threadSleepUntil globalThreadSleepUntil;
@@ -97,6 +98,15 @@ extern exitThread globalExitThread;
 #define THREAD_CANCEL        globalCancelThread
 #define THREAD_DETACH        globalDetachThread
 #define THREAD_EXIT          globalExitThread
+
+// Set the global thread priority
+#define SET_THREAD_PRIORITY(p) threadSetThreadPriority((p))
+
+/*
+ * Set thread priority before create
+ * @UINT32 - IN - target thread priority
+ */
+VOID threadSetThreadPriority(UINT32);
 
 #ifdef __cplusplus
 }

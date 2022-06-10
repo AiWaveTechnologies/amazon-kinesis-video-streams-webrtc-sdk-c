@@ -17,6 +17,8 @@
 #include "kvs/platform_utils.h"
 #include "thread.h"
 
+static volatile SIZE_T gThreadPriority = 1;
+
 #if defined _WIN32 || defined _WIN64 || defined __CYGWIN__
 /**
  * Thread wrapper for Windows
@@ -310,12 +312,12 @@ CleanUp:
 
 PUBLIC_API STATUS defaultCreateThreadEx(PTID pThreadId, PCHAR threadName, UINT32 threadSize, BOOL joinable, startRoutine start, PVOID args)
 {
-    return defaultCreateThreadExPri(pThreadId, threadName, 1, threadSize, joinable, start, args);
+    return defaultCreateThreadExPri(pThreadId, threadName, gThreadPriority, threadSize, joinable, start, args);
 }
 
 PUBLIC_API STATUS defaultCreateThread(PTID pThreadId, startRoutine start, PVOID args)
 {
-    return defaultCreateThreadExPri(pThreadId, NULL, 1, 0, TRUE, start, args);
+    return defaultCreateThreadExPri(pThreadId, NULL, gThreadPriority, 0, TRUE, start, args);
 }
 
 PUBLIC_API STATUS defaultJoinThread(TID threadId, PVOID* retVal)
@@ -452,6 +454,11 @@ PUBLIC_API VOID defaultThreadSleepUntil(UINT64 time)
     if (time > curTime) {
         THREAD_SLEEP(time - curTime);
     }
+}
+
+VOID threadSetThreadPriority(UINT32 targetThreadPriority)
+{
+    ATOMIC_STORE(&gThreadPriority, (SIZE_T) targetThreadPriority);
 }
 
 getTId globalGetThreadId = defaultGetThreadId;
