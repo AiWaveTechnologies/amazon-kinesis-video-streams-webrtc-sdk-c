@@ -151,7 +151,7 @@ STATUS net_getLocalhostIpAddresses(PKvsIpAddress destIpList, PUINT32 pDestIpList
     }
 #else
     //#error "need to add the network interface."
-    extern UCHAR* ameba_get_ip(void);
+    extern uint8_t* ameba_get_ip(void);
     destIpList[ipCount].isPointToPoint = 0;
     destIpList[ipCount].family = KVS_IP_FAMILY_TYPE_IPV4;
     destIpList[ipCount].port = 0;

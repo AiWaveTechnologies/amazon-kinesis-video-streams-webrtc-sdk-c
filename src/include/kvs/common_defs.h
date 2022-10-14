@@ -24,8 +24,9 @@ extern "C" {
  * HEADERS
  ******************************************************************************/
 #ifdef KVS_PLAT_RTK_FREERTOS
-#include "basic_types.h"
-#include "integer.h"
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 #endif
 
 /******************************************************************************
@@ -191,7 +192,9 @@ typedef INT32 BOOL;
 #endif
 #endif
 #else
-#ifndef KVS_PLAT_RTK_FREERTOS
+#ifdef KVS_PLAT_RTK_FREERTOS
+typedef unsigned char BOOL;
+#else
 typedef INT32 BOOL;
 #endif
 #endif
@@ -292,6 +295,8 @@ typedef ULONG_PTR SIZE_T, *PSIZE_T;
 typedef LONG_PTR SSIZE_T, *PSSIZE_T;
 #elif !(defined _WIN32 || defined _WIN64)
 #ifdef KVS_PLAT_RTK_FREERTOS
+typedef size_t SIZE_T;
+typedef ssize_t SSIZE_T;
 typedef SIZE_T* PSIZE_T;
 typedef SSIZE_T* PSSIZE_T;
 #else
