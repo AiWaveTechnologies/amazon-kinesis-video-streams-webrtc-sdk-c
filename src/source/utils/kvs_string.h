@@ -41,6 +41,7 @@ extern "C" {
 #define PRINTF     printf
 #define SPRINTF    sprintf
 #define SNPRINTF   snprintf
+#define SSCANF     sscanf
 #define TRIMSTRALL trimstrall
 #define LTRIMSTR   ltrimstr
 #define RTRIMSTR   rtrimstr

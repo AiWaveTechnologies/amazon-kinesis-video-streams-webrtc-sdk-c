@@ -195,9 +195,18 @@ static STATUS priv_file_credential_provider_read(PFileCredentialProvider pFileCr
      * Currently the credential file can have two formats, one is "CREDENTIALS accessKey expiration secretKey sessionToken", and
      * the other is just "CREDENTIALS accessKey secretKey". So the second token can be either expiration or secret key.
      */
-
+#if 0
     FSCANF(fp, "%11s %" STR(MAX_ACCESS_KEY_LEN) "s %" STR(MAX_EXPIRATION_LEN) "s %" STR(MAX_SECRET_KEY_LEN) "s %" STR(MAX_SESSION_TOKEN_LEN) "s",
            credentialMarker, accessKeyId, thirdTokenStr, fourthTokenStr, sessionToken);
+#else
+    PCHAR tmpBuf = (PCHAR) MEMCALLOC(1, fileLen + 1);
+    tmpBuf[fileLen] = '\0';
+    CHK(tmpBuf != NULL, STATUS_NOT_ENOUGH_MEMORY);
+    FREAD(tmpBuf, fileLen, 1, fp);
+    SSCANF(tmpBuf, "%11s %" STR(MAX_ACCESS_KEY_LEN) "s %" STR(MAX_EXPIRATION_LEN) "s %" STR(MAX_SECRET_KEY_LEN) "s %" STR(MAX_SESSION_TOKEN_LEN) "s",
+           credentialMarker, accessKeyId, thirdTokenStr, fourthTokenStr, sessionToken);
+    MEMFREE(tmpBuf);
+#endif
 
     // if the fourth token is empty, it means the credential file only has accessKey and secretKey
     if (fourthTokenStr[0] == '\0') {
