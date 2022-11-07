@@ -365,6 +365,23 @@ STATUS socket_connection_sendWithRetry(PSocketConnection pSocketConnection, PBYT
     CHK(pSocketConnection != NULL, STATUS_SOCKET_CONN_NULL_ARG);
     CHK(buf != NULL && bufLen > 0, STATUS_SOCKET_CONN_INVALID_ARG);
 
+#ifdef KVS_PLAT_RTK_FREERTOS
+    if (pSocketConnection->protocol == KVS_SOCKET_PROTOCOL_UDP) {
+        extern int skbbuf_used_num;
+        extern int skbdata_used_num;
+        extern int max_local_skb_num;
+        extern int max_skb_buf_num;
+        //Skip the frame if skb buffer is not available now. Otherwise, socket will be closed with error: No buffer space available
+        if ((skbdata_used_num > (max_skb_buf_num - 16)) || (skbbuf_used_num > (max_local_skb_num - 16))) {
+            DLOGW("skb buffer is not available now, skip this frame.");
+            if (pBytesWritten != NULL) {
+                *pBytesWritten = 0;
+            }
+            return STATUS_SUCCESS;
+        }
+    }
+#endif
+
     if (pDestIp != NULL) {
         if (IS_IPV4_ADDR(pDestIp)) {
             CHK(NULL != (pIpv4Addr = (struct sockaddr_in*) MEMALLOC(SIZEOF(struct sockaddr_in))), STATUS_SOCKET_CONN_NOT_ENOUGH_MEMORY);
@@ -387,7 +404,7 @@ STATUS socket_connection_sendWithRetry(PSocketConnection pSocketConnection, PBYT
     }
     // start sending the data.
     while (socketWriteAttempt < MAX_SOCKET_WRITE_RETRY && bytesWritten < bufLen) {
-        socketResult = sendto(pSocketConnection->localSocket, buf, bufLen, NO_SIGNAL, destAddr, addrLen);
+        socketResult = sendto(pSocketConnection->localSocket, buf + bytesWritten, bufLen - bytesWritten, NO_SIGNAL, destAddr, addrLen);
         if (socketResult < 0) {
             errorNum = net_getErrorCode();
             if (errorNum == EAGAIN || errorNum == EWOULDBLOCK) {
@@ -411,12 +428,14 @@ STATUS socket_connection_sendWithRetry(PSocketConnection pSocketConnection, PBYT
                 DLOGE("sendto() failed with errno %s", net_getErrorString(errorNum));
                 break;
             }
+
+            // Indicate an attempt only on error
+            socketWriteAttempt++;
+            if (socketWriteAttempt > 1) {
+                DLOGW("sendto retry: %d/%d", socketWriteAttempt, MAX_SOCKET_WRITE_RETRY);
+            }
         } else {
             bytesWritten += socketResult;
-        }
-        socketWriteAttempt++;
-        if (socketWriteAttempt > 1) {
-            DLOGD("sendto retry: %d/%d", socketWriteAttempt, MAX_SOCKET_WRITE_RETRY);
         }
     }
 
