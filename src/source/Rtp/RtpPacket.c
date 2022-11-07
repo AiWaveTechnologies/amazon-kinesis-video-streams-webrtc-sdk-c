@@ -98,6 +98,8 @@ STATUS rtp_packet_createFromBytes(PBYTE rawPacket, UINT32 packetLength, PRtpPack
 CleanUp:
 
     if (STATUS_FAILED(retStatus) && pRtpPacket != NULL) {
+        // Release ownership of rawPacket instead of freeing rawPacket
+        pRtpPacket->pRawPacket = NULL;
         rtp_packet_free(&pRtpPacket);
         pRtpPacket = NULL;
     }

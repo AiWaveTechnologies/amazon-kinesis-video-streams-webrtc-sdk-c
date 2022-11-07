@@ -52,13 +52,13 @@ typedef struct __JitterBuffer {
     // holds estimated jitter, in clockRate units
     DOUBLE jitter;
     UINT32 lastPushTimestamp;
-    UINT16 lastRemovedSequenceNumber;
-    UINT16 lastPopSequenceNumber;
-    UINT32 lastPopTimestamp;
+    UINT16 headSequenceNumber;
+    UINT32 headTimestamp;
     UINT64 maxLatency;
     UINT64 customData;
     UINT32 clockRate;
     BOOL started;
+    BOOL firstFrameProcessed;
     PHashTable pPkgBufferHashTable;
 } JitterBuffer, *PJitterBuffer;
 
@@ -68,7 +68,6 @@ typedef struct __JitterBuffer {
 STATUS jitter_buffer_create(FrameReadyFunc, FrameDroppedFunc, DepayRtpPayloadFunc, UINT32, UINT32, UINT64, PJitterBuffer*);
 STATUS jitter_buffer_free(PJitterBuffer*);
 STATUS jitter_buffer_push(PJitterBuffer, PRtpPacket, PBOOL);
-STATUS jitter_buffer_pop(PJitterBuffer, BOOL);
 STATUS jitter_buffer_dropBufferData(PJitterBuffer, UINT16, UINT16, UINT32);
 STATUS jitter_buffer_fillFrameData(PJitterBuffer, PBYTE, UINT32, PUINT32, UINT16, UINT16);
 

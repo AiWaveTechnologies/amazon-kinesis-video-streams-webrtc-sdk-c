@@ -291,6 +291,9 @@ STATUS pc_sendPacketToRtpReceiver(PKvsPeerConnection pKvsPeerConnection, PBYTE p
             CHK(NULL != (pPayload = (PBYTE) MEMALLOC(bufferLen)), STATUS_PEER_CONN_NOT_ENOUGH_MEMORY);
             MEMCPY(pPayload, pBuffer, bufferLen);
             CHK_STATUS(rtp_packet_createFromBytes(pPayload, bufferLen, &pRtpPacket));
+            // pRtpPacket took ownership of pPayload. Set pPayload to NULL to
+            // avoid possible double-free.
+            pPayload = NULL;
             pRtpPacket->receivedTime = now;
 
             // https://tools.ietf.org/html/rfc3550#section-6.4.1
