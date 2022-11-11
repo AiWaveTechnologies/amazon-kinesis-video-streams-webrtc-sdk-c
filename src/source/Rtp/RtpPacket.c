@@ -315,7 +315,9 @@ STATUS rtp_packet_setBytesFromPacket(PRtpPacket pRtpPacket, PBYTE pRawPacket, UI
         pCurPtr += pHeader->extensionLength;
     }
 
-    MEMCPY(pCurPtr, pRtpPacket->payload, pRtpPacket->payloadLength);
+    if (pRtpPacket->payload != NULL && pRtpPacket->payloadLength > 0) {
+        MEMCPY(pCurPtr, pRtpPacket->payload, pRtpPacket->payloadLength);
+    }
 CleanUp:
     LEAVES();
     return retStatus;

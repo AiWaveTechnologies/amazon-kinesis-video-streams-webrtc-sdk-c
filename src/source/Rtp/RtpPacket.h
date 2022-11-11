@@ -120,6 +120,9 @@ STATUS rtp_packet_free(PRtpPacket*);
  *
  * @return STATUS status of execution
  */
+STATUS rtp_packet_create(UINT8, BOOL, BOOL, UINT8, BOOL, UINT8, UINT16, UINT32, UINT32, PUINT32, UINT16, UINT32, PBYTE, PBYTE, UINT32, PRtpPacket*);
+STATUS rtp_packet_set(UINT8, BOOL, BOOL, UINT8, BOOL, UINT8, UINT16, UINT32, UINT32, PUINT32, UINT16, UINT32, PBYTE, PBYTE, UINT32, PRtpPacket);
+STATUS rtp_packet_free(PRtpPacket*);
 STATUS rtp_packet_createFromBytes(PBYTE, UINT32, PRtpPacket*);
 STATUS rtp_packet_constructRetransmitPacketFromBytes(PBYTE, UINT32, UINT16, UINT8, UINT32, PRtpPacket*);
 STATUS rtp_packet_setPacketFromBytes(PBYTE, UINT32, PRtpPacket);
