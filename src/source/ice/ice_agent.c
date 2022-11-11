@@ -2421,7 +2421,9 @@ STATUS ice_agent_handleInboundStunPacket(PIceAgent pIceAgent, PBYTE pBuffer, UIN
                 pIceCandidatePair->state == ICE_CANDIDATE_PAIR_STATE_IN_PROGRESS) {
                 PIceCandidatePair pHeadPair = NULL;
                 // do not exit if there is an error.
-                stackQueuePeek(pIceAgent->pTriggeredCheckQueue, (PUINT64) &pHeadPair);
+                UINT64 PairVal = 0;
+                stackQueuePeek(pIceAgent->pTriggeredCheckQueue, (PUINT64) &PairVal);
+                pHeadPair = (PIceCandidatePair)PairVal;
                 if (pHeadPair != NULL) {
                     if (pHeadPair->priority < pIceCandidatePair->priority) {
                         DLOGW("the priority of triggered check queue may be reverse.");
