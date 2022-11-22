@@ -26,6 +26,8 @@
 /******************************************************************************
  * FUNCTIONS
  ******************************************************************************/
+static volatile PSctpSessionControl pSctpSessionControl = NULL;
+
 static STATUS initSctpAddrConn(PSctpSession pSctpSession, struct sockaddr_conn* sconn)
 {
     ENTERS();
@@ -50,30 +52,30 @@ static STATUS configureSctpSocket(struct socket* socket)
     UINT16 event_types[] = {SCTP_ASSOC_CHANGE,   SCTP_PEER_ADDR_CHANGE,      SCTP_REMOTE_ERROR,
                             SCTP_SHUTDOWN_EVENT, SCTP_ADAPTATION_INDICATION, SCTP_PARTIAL_DELIVERY_EVENT};
 
-    CHK(usrsctp_set_non_blocking(socket, 1) == 0, STATUS_SCTP_SO_NON_BLOCKING_FAILED);
+    CHK(usrsctp_set_non_blocking(socket, 1) == 0, STATUS_SCTP_SESSION_SETUP_FAILED);
 
     // onSctpOutboundPacket must not be called after close
     linger_opt.l_onoff = 1;
     linger_opt.l_linger = 0;
-    CHK(usrsctp_setsockopt(socket, SOL_SOCKET, SO_LINGER, &linger_opt, SIZEOF(linger_opt)) == 0, STATUS_SCTP_SO_LINGER_FAILED);
+    CHK(usrsctp_setsockopt(socket, SOL_SOCKET, SO_LINGER, &linger_opt, SIZEOF(linger_opt)) == 0, STATUS_SCTP_SESSION_SETUP_FAILED);
 
     // packets are generally sent as soon as possible and no unnecessary
     // delays are introduced, at the cost of more packets in the network.
-    CHK(usrsctp_setsockopt(socket, IPPROTO_SCTP, SCTP_NODELAY, &valueOn, SIZEOF(valueOn)) == 0, STATUS_SCTP_SO_NODELAY_FAILED);
+    CHK(usrsctp_setsockopt(socket, IPPROTO_SCTP, SCTP_NODELAY, &valueOn, SIZEOF(valueOn)) == 0, STATUS_SCTP_SESSION_SETUP_FAILED);
 
     MEMSET(&event, 0, SIZEOF(event));
     event.se_assoc_id = SCTP_FUTURE_ASSOC;
     event.se_on = 1;
     for (i = 0; i < (UINT32)(SIZEOF(event_types) / SIZEOF(UINT16)); i++) {
         event.se_type = event_types[i];
-        CHK(usrsctp_setsockopt(socket, IPPROTO_SCTP, SCTP_EVENT, &event, SIZEOF(struct sctp_event)) == 0, STATUS_SCTP_EVENT_FAILED);
+        CHK(usrsctp_setsockopt(socket, IPPROTO_SCTP, SCTP_EVENT, &event, SIZEOF(struct sctp_event)) == 0, STATUS_SCTP_SESSION_SETUP_FAILED);
     }
 
     struct sctp_initmsg initmsg;
     MEMSET(&initmsg, 0, SIZEOF(struct sctp_initmsg));
     initmsg.sinit_num_ostreams = 300;
     initmsg.sinit_max_instreams = 300;
-    CHK(usrsctp_setsockopt(socket, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, SIZEOF(struct sctp_initmsg)) == 0, STATUS_SCTP_INITMSG_FAILED);
+    CHK(usrsctp_setsockopt(socket, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, SIZEOF(struct sctp_initmsg)) == 0, STATUS_SCTP_SESSION_SETUP_FAILED);
 
 CleanUp:
     LEAVES();
@@ -94,19 +96,26 @@ static INT32 onSctpOutboundPacket(PVOID addr, PVOID data, ULONG length, UINT8 to
 {
     UNUSED_PARAM(tos);
     UNUSED_PARAM(set_df);
-
+    BOOL containKey;
     PSctpSession pSctpSession = (PSctpSession) addr;
 
-    if (pSctpSession == NULL || ATOMIC_LOAD(&pSctpSession->shutdownStatus) == SCTP_SESSION_SHUTDOWN_INITIATED ||
-        pSctpSession->sctpSessionCallbacks.outboundPacketFunc == NULL) {
-        if (pSctpSession != NULL) {
-            ATOMIC_STORE(&pSctpSession->shutdownStatus, SCTP_SESSION_SHUTDOWN_COMPLETED);
-        }
+    if (pSctpSession == NULL || pSctpSession->sctpSessionCallbacks.outboundPacketFunc == NULL) {
         return -1;
     }
 
-    pSctpSession->sctpSessionCallbacks.outboundPacketFunc(pSctpSession->sctpSessionCallbacks.customData, data, length);
 
+    MUTEX_LOCK(pSctpSessionControl->lock);
+    hash_table_contains(pSctpSessionControl->activeSctpSessions, pSctpSession->key, &containKey);
+    MUTEX_UNLOCK(pSctpSessionControl->lock);
+
+    /* If the key is not in activeSctpSessions, then the session must have been freed. Thus do not call callback.
+     * Fixes issue stated here: https://github.com/sctplab/usrsctp/issues/147.
+     * (return -1 otherwise usrsctp_finish() won't finish) */
+    if (!containKey) {
+        return 0;
+    }
+
+    pSctpSession->sctpSessionCallbacks.outboundPacketFunc(pSctpSession->sctpSessionCallbacks.customData, data, length);
     return 0;
 }
 /**
@@ -124,17 +133,14 @@ static STATUS handleDcepPacket(PSctpSession pSctpSession, UINT32 streamId, PBYTE
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
     UINT16 labelLength = 0;
-    UINT16 protocolLength = 0;
 
     // Assert that is DCEP of type DataChannelOpen
     CHK(length > SCTP_DCEP_HEADER_LENGTH && data[0] == DCEP_DATA_CHANNEL_OPEN, STATUS_SUCCESS);
 
     MEMCPY(&labelLength, data + 8, SIZEOF(UINT16));
-    MEMCPY(&protocolLength, data + 10, SIZEOF(UINT16));
     putInt16((PINT16) &labelLength, labelLength);
-    putInt16((PINT16) &protocolLength, protocolLength);
 
-    CHK((labelLength + protocolLength + SCTP_DCEP_HEADER_LENGTH) >= length, STATUS_SCTP_INVALID_DCEP_PACKET);
+    CHK((labelLength + SCTP_DCEP_HEADER_LENGTH) >= length, STATUS_SCTP_INVALID_DCEP_PACKET);
 
     pSctpSession->sctpSessionCallbacks.dataChannelOpenFunc(pSctpSession->sctpSessionCallbacks.customData, streamId, data + SCTP_DCEP_HEADER_LENGTH,
                                                            labelLength);
@@ -207,14 +213,32 @@ STATUS sctp_session_init(VOID)
     // Disable Explicit Congestion Notification
     usrsctp_sysctl_set_sctp_ecn_enable(0);
 
+    pSctpSessionControl = MEMALLOC(SIZEOF(SctpSessionControl));
+    pSctpSessionControl->lock = MUTEX_CREATE(FALSE);
+    CHK_STATUS(hashTableCreate(&pSctpSessionControl->activeSctpSessions));
+
+CleanUp:
+
     return retStatus;
 }
 
 VOID sctp_session_deinit()
 {
+    if (pSctpSessionControl != NULL) {
+        MUTEX_LOCK(pSctpSessionControl->lock);
+        hash_table_clear(pSctpSessionControl->activeSctpSessions);
+        MUTEX_UNLOCK(pSctpSessionControl->lock);
+    }
+
     // need to block until usrsctp_finish or sctp thread could be calling free objects and cause segfault
     while (usrsctp_finish() != 0) {
         THREAD_SLEEP(DEFAULT_USRSCTP_TEARDOWN_POLLING_INTERVAL);
+    }
+
+    if (pSctpSessionControl != NULL) {
+        MUTEX_FREE(pSctpSessionControl->lock);
+        hash_table_free(pSctpSessionControl->activeSctpSessions);
+        SAFE_MEMFREE(pSctpSessionControl);
     }
 }
 
@@ -236,27 +260,31 @@ STATUS sctp_session_create(PSctpSessionCallbacks pSctpSessionCallbacks, PSctpSes
     MEMSET(&localConn, 0x00, SIZEOF(struct sockaddr_conn));
     MEMSET(&remoteConn, 0x00, SIZEOF(struct sockaddr_conn));
 
-    ATOMIC_STORE(&pSctpSession->shutdownStatus, SCTP_SESSION_ACTIVE);
+    // use timestamp as key
+    pSctpSession->key = GETTIME();
+    MUTEX_LOCK(pSctpSessionControl->lock);
+    CHK_STATUS(hashTableUpsert(pSctpSessionControl->activeSctpSessions, pSctpSession->key, (UINT64) pSctpSession));
+    MUTEX_UNLOCK(pSctpSessionControl->lock);
+
     pSctpSession->sctpSessionCallbacks = *pSctpSessionCallbacks;
 
     CHK_STATUS(initSctpAddrConn(pSctpSession, &localConn));
     CHK_STATUS(initSctpAddrConn(pSctpSession, &remoteConn));
     // create the sctp socket.
     CHK((pSctpSession->socket = usrsctp_socket(AF_CONN, SOCK_STREAM, IPPROTO_SCTP, onSctpInboundPacket, NULL, 0, pSctpSession)) != NULL,
-        STATUS_SCTP_SO_CREATE_FAILED);
+        STATUS_SCTP_SESSION_SETUP_FAILED);
     usrsctp_register_address(pSctpSession);
     CHK_STATUS(configureSctpSocket(pSctpSession->socket));
     // bind the remote sctp socket.
-    CHK(usrsctp_bind(pSctpSession->socket, (struct sockaddr*) &localConn, SIZEOF(localConn)) == 0, STATUS_SCTP_SO_BIND_FAILED);
+    CHK(usrsctp_bind(pSctpSession->socket, (struct sockaddr*) &localConn, SIZEOF(localConn)) == 0, STATUS_SCTP_SESSION_SETUP_FAILED);
     // bind the sctp socket
     connectStatus = usrsctp_connect(pSctpSession->socket, (struct sockaddr*) &remoteConn, SIZEOF(remoteConn));
-    CHK(connectStatus >= 0 || errno == EINPROGRESS, STATUS_SCTP_SO_CONNECT_FAILED);
+    CHK(connectStatus >= 0 || errno == EINPROGRESS, STATUS_SCTP_SESSION_SETUP_FAILED);
 
-    memcpy(&params.spp_address, &remoteConn, SIZEOF(remoteConn));
+    MEMCPY(&params.spp_address, &remoteConn, SIZEOF(remoteConn));
     params.spp_flags = SPP_PMTUD_DISABLE;
     params.spp_pathmtu = SCTP_MTU;
-    CHK(usrsctp_setsockopt(pSctpSession->socket, IPPROTO_SCTP, SCTP_PEER_ADDR_PARAMS, &params, SIZEOF(params)) == 0,
-        STATUS_SCTP_PEER_ADDR_PARAMS_FAILED);
+    CHK(usrsctp_setsockopt(pSctpSession->socket, IPPROTO_SCTP, SCTP_PEER_ADDR_PARAMS, &params, SIZEOF(params)) == 0, STATUS_SCTP_SESSION_SETUP_FAILED);
 
 CleanUp:
     if (STATUS_FAILED(retStatus)) {
@@ -274,7 +302,6 @@ STATUS sctp_session_free(PSctpSession* ppSctpSession)
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
     PSctpSession pSctpSession;
-    UINT64 shutdownTimeout;
 
     CHK(ppSctpSession != NULL, STATUS_NULL_ARG);
 
@@ -283,20 +310,17 @@ STATUS sctp_session_free(PSctpSession* ppSctpSession)
     CHK(pSctpSession != NULL, retStatus);
 
     usrsctp_deregister_address(pSctpSession);
-    /* handle issue mentioned here: https://github.com/sctplab/usrsctp/issues/147
-     * the change in shutdownStatus will trigger onSctpOutboundPacket to return -1 */
-    ATOMIC_STORE(&pSctpSession->shutdownStatus, SCTP_SESSION_SHUTDOWN_INITIATED);
 
     if (pSctpSession->socket != NULL) {
         usrsctp_set_ulpinfo(pSctpSession->socket, NULL);
         usrsctp_shutdown(pSctpSession->socket, SHUT_RDWR);
         usrsctp_close(pSctpSession->socket);
+        pSctpSession->socket = NULL;
     }
 
-    shutdownTimeout = GETTIME() + DEFAULT_SCTP_SHUTDOWN_TIMEOUT;
-    while (ATOMIC_LOAD(&pSctpSession->shutdownStatus) != SCTP_SESSION_SHUTDOWN_COMPLETED && GETTIME() < shutdownTimeout) {
-        THREAD_SLEEP(DEFAULT_USRSCTP_TEARDOWN_POLLING_INTERVAL);
-    }
+    MUTEX_LOCK(pSctpSessionControl->lock);
+    hash_table_remove(pSctpSessionControl->activeSctpSessions, pSctpSession->key);
+    MUTEX_UNLOCK(pSctpSessionControl->lock);
 
     SAFE_MEMFREE(*ppSctpSession);
 

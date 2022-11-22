@@ -27,6 +27,7 @@ extern "C" {
  ******************************************************************************/
 #include <usrsctp.h>
 #include "kvs/webrtc_client.h"
+#include "hash_table.h"
 /******************************************************************************
  * DEFINITIONS
  ******************************************************************************/
@@ -59,11 +60,6 @@ extern "C" {
 #define SCTP_DCEP_LABEL_OFFSET           12
 #define SCTP_MAX_ALLOWABLE_PACKET_LENGTH (SCTP_DCEP_HEADER_LENGTH + MAX_DATA_CHANNEL_NAME_LEN + MAX_DATA_CHANNEL_PROTOCOL_LEN + 2)
 
-#define SCTP_SESSION_ACTIVE             0
-#define SCTP_SESSION_SHUTDOWN_INITIATED 1
-#define SCTP_SESSION_SHUTDOWN_COMPLETED 2
-
-#define DEFAULT_SCTP_SHUTDOWN_TIMEOUT 2 * HUNDREDS_OF_NANOS_IN_A_SECOND
 
 #define DEFAULT_USRSCTP_TEARDOWN_POLLING_INTERVAL (10 * HUNDREDS_OF_NANOS_IN_A_MILLISECOND)
 
@@ -74,14 +70,10 @@ enum {
 };
 
 typedef enum {
-    DCEP_DATA_CHANNEL_RELIABLE_ORDERED = (BYTE) 0x00,   //< The Data Channel provides a reliable in-order bi-directional communication
-    DCEP_DATA_CHANNEL_RELIABLE_UNORDERED = (BYTE) 0x80, //!< The Data Channel provides a reliable unordered bi-directional communication
-    DCEP_DATA_CHANNEL_PARTIAL_RELIABLE_REXMIT_UNORDERED =
-        (BYTE) 0x81, //!< The Data Channel provides a partial reliable unordered bi-directional communication.
-    DCEP_DATA_CHANNEL_PARTIAL_RELIABLE_TIMED_UNORDERED =
-        (BYTE) 0x82,                        //!< The Data Channel provides a partial reliable unordered bi-directional communication.
-    DCEP_DATA_CHANNEL_REXMIT = (BYTE) 0x01, //!< The Data Channel provides a partially-reliable in-order bi-directional communication.
-    DCEP_DATA_CHANNEL_TIMED = (BYTE) 0x02   //!< The Data Channel provides a partial reliable in-order bi-directional communication.
+    DCEP_DATA_CHANNEL_RELIABLE_ORDERED = (BYTE) 0x00,
+    DCEP_DATA_CHANNEL_RELIABLE_UNORDERED = (BYTE) 0x80,
+    DCEP_DATA_CHANNEL_REXMIT = (BYTE) 0x01,
+    DCEP_DATA_CHANNEL_TIMED = (BYTE) 0x02
 } DATA_CHANNEL_TYPE;
 
 // Callback that is fired when SCTP Association wishes to send packet
@@ -95,21 +87,31 @@ typedef VOID (*SctpSessionDataChannelOpenFunc)(UINT64, UINT32, PBYTE, UINT32);
 // Argument is ChannelID and Message + Len
 typedef VOID (*SctpSessionDataChannelMessageFunc)(UINT64, UINT32, BOOL, PBYTE, UINT32);
 
-typedef struct __SctpSessionCallbacks {
+typedef struct {
     UINT64 customData;
-    SctpSessionOutboundPacketFunc outboundPacketFunc; //!< the outbound callback.
+    SctpSessionOutboundPacketFunc outboundPacketFunc;
     SctpSessionDataChannelOpenFunc dataChannelOpenFunc;
     SctpSessionDataChannelMessageFunc dataChannelMessageFunc;
 } SctpSessionCallbacks, *PSctpSessionCallbacks;
 
-typedef struct __SctpSession {
-    volatile SIZE_T shutdownStatus;
+typedef struct {
     struct socket* socket;
     struct sctp_sendv_spa spa;
     BYTE packet[SCTP_MAX_ALLOWABLE_PACKET_LENGTH];
     UINT32 packetSize;
     SctpSessionCallbacks sctpSessionCallbacks;
+    UINT64 key;
 } SctpSession, *PSctpSession;
+
+typedef struct {
+    /* Protect activeSctpSessions access */
+    MUTEX lock;
+
+    /* This hash table is used as a set. When sctpSession get created it will be assigned with a key
+     * and the key is inserted into the table. When sctpSession is freed, its key is removed from
+     * the table. */
+    PHashTable activeSctpSessions;
+} SctpSessionControl, *PSctpSessionControl;
 
 /******************************************************************************
  * FUNCTIONS
