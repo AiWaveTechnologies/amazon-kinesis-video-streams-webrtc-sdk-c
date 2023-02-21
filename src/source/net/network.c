@@ -483,6 +483,14 @@ PCHAR net_getErrorString(INT32 error)
     return buffer;
 }
 #else
+#ifdef KVS_PLAT_RTK_FREERTOS
+PCHAR net_getErrorString(INT32 error)
+{
+    static CHAR buffer[32];
+    SNPRINTF(buffer, SIZEOF(buffer), "lwip net error code:%d", error);
+    return buffer;
+}
+#else
 PCHAR net_getErrorString(INT32 error)
 {
     if (error != 0) {
@@ -490,6 +498,7 @@ PCHAR net_getErrorString(INT32 error)
     }
     return strerror(error);
 }
+#endif
 #endif
 
 #ifdef KVS_PLAT_RTK_FREERTOS
