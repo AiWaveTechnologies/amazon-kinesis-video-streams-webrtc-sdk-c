@@ -102,6 +102,19 @@ static int mbedtls_test_rnd_std_rand(void* rng_state, unsigned char* output, siz
 }
 #endif
 
+
+static const int ciphersuite_customer[] =
+{
+    MBEDTLS_TLS_RSA_WITH_AES_128_GCM_SHA256,
+    0
+};
+
+static void ssl_debug_func(void *ctx, int level, const char *file, int line, const char *str)
+{
+    printf("[mbedtls] %s:%d: %s\n\r", file, line, str);
+}
+
+
 static int prvInitConfig(NetIo_t* pxNet, const char* pcRootCA, const char* pcCert, const char* pcPrivKey, bool bFilePath)
 {
     int xRes = STATUS_SUCCESS;
@@ -114,8 +127,15 @@ static int prvInitConfig(NetIo_t* pxNet, const char* pcRootCA, const char* pcCer
             DLOGE("Failed to config ssl");
             xRes = STATUS_NULL_ARG;
         } else {
+            mbedtls_ssl_conf_ciphersuites(&(pxNet->xConf), ciphersuite_customer);
             mbedtls_ssl_conf_rng(&(pxNet->xConf), mbedtls_ctr_drbg_random, &(pxNet->xCtrDrbg));
             mbedtls_ssl_conf_read_timeout(&(pxNet->xConf), pxNet->uRecvTimeoutMs);
+
+            if (loggerGetLogLevel() <= LOG_LEVEL_BETA) {
+                mbedtls_debug_set_threshold(2);
+                mbedtls_ssl_conf_dbg(&(pxNet->xConf), ssl_debug_func, NULL);
+            }
+
             NetIo_setSendTimeout(pxNet, pxNet->uSendTimeoutMs);
 
             if (pcRootCA != NULL && pcCert != NULL && pcPrivKey != NULL) {
@@ -188,6 +208,7 @@ static int prvConnect(NetIo_t* pxNet, const char* pcHost, const char* pcPort, co
         xRes = STATUS_NULL_ARG;
     } else {
         /* nop */
+        DLOGD("Use ciphersuite %s", mbedtls_ssl_get_ciphersuite(&(pxNet->xSsl)));
     }
     return xRes;
 }
