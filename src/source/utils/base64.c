@@ -145,7 +145,7 @@ STATUS base64Encode(PVOID pInputData, UINT32 inputLength, PCHAR pOutputData, PUI
  * NOTE: pInputData should be NULL terminated
  * IMPLEMENTATION: We will ignore the '=' padding by removing those and will calculate the passing based on the string length
  */
-STATUS base64Decode(PCHAR pInputData, UINT32 inputLength, PBYTE pOutputData, PUINT32 pOutputLength)
+STATUS base64Decode_kvs(PCHAR pInputData, UINT32 inputLength, PBYTE pOutputData, PUINT32 pOutputLength)
 {
     UINT32 outputLength;
     UINT32 i;

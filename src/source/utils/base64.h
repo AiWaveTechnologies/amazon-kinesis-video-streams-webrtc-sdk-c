@@ -32,7 +32,7 @@ extern "C" {
  * Base64 encode/decode functionality
  */
 STATUS base64Encode(PVOID, UINT32, PCHAR, PUINT32);
-STATUS base64Decode(PCHAR, UINT32, PBYTE, PUINT32);
+STATUS base64Decode_kvs(PCHAR, UINT32, PBYTE, PUINT32);
 
 #ifdef __cplusplus
 }

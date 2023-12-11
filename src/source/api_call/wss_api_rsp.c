@@ -67,7 +67,7 @@ STATUS wss_api_rsp_receivedMessage(const CHAR* pMessage, UINT32 messageLen, PSig
             CHK(strLen <= MAX_SIGNALING_MESSAGE_LEN, STATUS_JSON_API_CALL_INVALID_RETURN);
 
             // Base64 decode the message
-            CHK_STATUS(base64Decode(pMessage + pTokens[i + 1].start, strLen,
+            CHK_STATUS(base64Decode_kvs(pMessage + pTokens[i + 1].start, strLen,
                                     (PBYTE)(pSignalingMessageWrapper->receivedSignalingMessage.signalingMessage.payload), &outLen));
             pSignalingMessageWrapper->receivedSignalingMessage.signalingMessage.payload[MAX_SIGNALING_MESSAGE_LEN] = '\0';
             pSignalingMessageWrapper->receivedSignalingMessage.signalingMessage.payloadLen = outLen;
